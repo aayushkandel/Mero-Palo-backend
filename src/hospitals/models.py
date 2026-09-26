@@ -2,6 +2,7 @@ from sqlalchemy import Column, BigInteger, String,Boolean ,DateTime
 from sqlalchemy.sql import func
 from src.utils.db import Base
 from src.utils.uid import generate_uid
+from sqlalchemy.orm import relationship
 
 class Hospital(Base):
     __tablename__= "hospitals"
@@ -16,3 +17,5 @@ class Hospital(Base):
     created_at = Column(DateTime,server_default=func.now(),nullable=False)
     updated_at = Column(DateTime,server_default=func.now(),onupdate=func.now(),nullable=False )
     deleted_at=Column(DateTime(timezone=True),nullable=True)
+
+    hospital = relationship("Hospital",back_populates="departments")

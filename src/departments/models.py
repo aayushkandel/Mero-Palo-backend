@@ -2,6 +2,8 @@ from sqlalchemy import Column, BigInteger, String, DateTime,ForeignKey
 from sqlalchemy.sql import func
 from src.utils.uid import generate_uid
 from src.utils.db import Base
+from sqlalchemy.orm import relationship
+
 
 class Department(Base):
     __tablename__= "departments"
@@ -15,3 +17,6 @@ class Department(Base):
     created_at = Column(DateTime,server_default=func.now(),nullable=False)
     updated_at = Column(DateTime,server_default=func.now(),onupdate=func.now(),nullable=False )
     deleted_at=Column(DateTime(timezone=True),nullable=True)
+
+
+    departments = relationship("Department",back_populates="hospital",cascade="all, delete-orphan")
