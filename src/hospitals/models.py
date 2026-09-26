@@ -8,8 +8,8 @@ class Hospital(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     huid = Column(String(12),unique=True,nullable=False,default=generate_uid)
-    hospital_name=Column(String(255),nullable=False)
-    hospital_phone=Column(String(20),nullable=False, unique=True)
+    name=Column(String(255),nullable=False)
+    phone=Column(String(20),nullable=False, unique=True)
     registration_no=Column(String(255),nullable=False,unique=True)
     thumbnail_image=Column(String(255),nullable=False)
     is_authorized= Column(Boolean,nullable=False,default=False)
