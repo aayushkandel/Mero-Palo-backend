@@ -1,25 +1,25 @@
-import getpass
-from src.utils.db import LocalSession
-from src.users.models import User
+# import getpass
+# from src.utils.db import LocalSession
+# from src.users.models import User
 
 
 
-db = LocalSession()
+# db = LocalSession()
 
 
-email = input("Enter email: ")
-password = getpass.getpass("Enter password: ")
+# email = input("Enter email: ")
+# password = getpass.getpass("Enter password: ")
 
-user = User(
+# user = User(
    
-    email=email,
-    password=(password),
-    role="super_admin"
-)
+#     email=email,
+#     password=(password),
+#     role="super_admin"
+# )
 
-db.add(user)
-db.commit()
+# db.add(user)
+# db.commit()
 
-print("Super admin created successfully.")
+# print("Super admin created successfully.")
 
-db.close()
+# db.close()

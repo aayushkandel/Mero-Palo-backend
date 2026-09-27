@@ -18,4 +18,5 @@ class Hospital(Base):
     updated_at = Column(DateTime,server_default=func.now(),onupdate=func.now(),nullable=False )
     deleted_at=Column(DateTime(timezone=True),nullable=True)
 
-    hospital = relationship("Hospital",back_populates="departments")
+    departments = relationship("Department",back_populates="hospital",cascade="all, delete-orphan")
+    tokens = relationship("Token",back_populates="hospital")

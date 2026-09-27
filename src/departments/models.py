@@ -19,4 +19,5 @@ class Department(Base):
     deleted_at=Column(DateTime(timezone=True),nullable=True)
 
 
-    departments = relationship("Department",back_populates="hospital",cascade="all, delete-orphan")
+    hospital = relationship("Hospital",back_populates="departments")
+    tokens = relationship("Token",back_populates="department")
