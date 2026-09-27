@@ -9,8 +9,8 @@ class User(Base):
 
     id= Column(BigInteger,primary_key=True,autoincrement=True)
     uuid = Column(String(12),unique=True,nullable=False,default=generate_uid)
-    name=Column(String(255),nullable=False)
-    email = Column(String(255), unique=True, nullable=False)
+    name=Column(String(255),nullable=True)
+    email = Column(String(255), unique=True, nullable=True)
     address = Column(String(255), nullable=True)
     phone=Column(String(20),nullable=False,unique=True)
     role=Column(String(50),nullable=False)
