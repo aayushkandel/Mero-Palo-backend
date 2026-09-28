@@ -1,5 +1,6 @@
 from fastapi import HTTPException,Request,Depends,status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from src.utils.db import get_db
 from src.users.models import User
 import jwt
@@ -9,7 +10,7 @@ from jwt.exceptions import InvalidTokenError
 
 
 
-def is_user_authenticated(request: Request,db: Session = Depends(get_db)):
+async def is_user_authenticated(request: Request,db: AsyncSession = Depends(get_db)):
     try:
 
         token = request.headers.get("authorization")
@@ -32,7 +33,9 @@ def is_user_authenticated(request: Request,db: Session = Depends(get_db)):
                     status_code=404,
                     detail="You are not a user"
             )
-        user = db.query(User).filter(User.id == user_id).first()
+
+        result=await db.execute(select(User).where(User.id==user_id))
+        user = result.scalar_one_or_none()
 
         if not user:
             raise HTTPException(
@@ -53,7 +56,7 @@ def is_user_authenticated(request: Request,db: Session = Depends(get_db)):
 
 
 # for admin authentication
-def is_admin_authenticated(request: Request,db: Session = Depends(get_db)):
+async def is_admin_authenticated(request: Request,db: AsyncSession = Depends(get_db)):
     try:
 
         token = request.headers.get("Authorization")
@@ -80,7 +83,8 @@ def is_admin_authenticated(request: Request,db: Session = Depends(get_db)):
             )
 
         # Find admin in User table
-        admin = db.query(User).filter(User.id == admin_id).first()
+        result= await db.execute(select(User).where(User.id==admin_id))
+        admin = result.scalar_one_or_none()
 
         if not admin:
             raise HTTPException(

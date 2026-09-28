@@ -1,16 +1,30 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+
 from src.utils.db import Base, engine
+
 from src.hospitals.models import Hospital
 from src.departments.models import Department
 from src.users.models import User
 from src.token.models import Token
+
 from src.users.router import user_routes
 
 
-app=FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    # Startup
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    yield
+
+    # Shutdown
+    await engine.dispose()
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(user_routes)
-
-Base.metadata.create_all(engine)
-
-

@@ -1,5 +1,6 @@
 from src.users.dtos import UserRegistration,UserLogin,UpdateUserProfile,ChangePassword
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from src.users.models import User
 from fastapi import HTTPException,status
 from src.utils.password_hash import get_password_hash,verify_password
@@ -11,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 # user registration controller
 
-def register(body: UserRegistration, db: Session):
+async def register(body: UserRegistration, db: AsyncSession):
 
     if not body.name or not body.name.strip():
         raise HTTPException(
@@ -43,10 +44,9 @@ def register(body: UserRegistration, db: Session):
             detail="Password didn't matched"
         )
 
+    result= await db.execute(select(User).where( User.phone == body.phone))
     # Check if phone already exists
-    exist_phone = db.query(User).filter(
-        User.phone == body.phone
-    ).first()
+    exist_phone = result.scalar_one_or_none()
 
     # User exists
     if exist_phone:
@@ -62,8 +62,8 @@ def register(body: UserRegistration, db: Session):
             exist_phone.address=None
            
 
-            db.commit()
-            db.refresh(exist_phone)
+            await db.commit()
+            await db.refresh(exist_phone)
 
             return exist_phone
 
@@ -85,8 +85,8 @@ def register(body: UserRegistration, db: Session):
     )
 
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    await db.commit()
+    await db.refresh(new_user)
 
     return new_user
 
@@ -95,14 +95,18 @@ def register(body: UserRegistration, db: Session):
 
 #user and super admin login controller
 
-def login_user(body:UserLogin,db:Session ):
-    user=db.query(User).filter(User.phone==body.phone).first()
+async def login_user(body:UserLogin,db:AsyncSession ):
+ 
 
     if not body.phone or not body.phone.strip():
                 raise HTTPException( status_code=status.HTTP_400_BAD_REQUEST,detail="Enter phone number")
     
     if not body.password or not body.password.strip():
                     raise HTTPException( status_code=status.HTTP_400_BAD_REQUEST,detail="Enter password " )
+
+    result= await db.execute(select(User).where(User.phone == body.phone))
+
+    user= result.scalar_one_or_none()
 
     if user.deleted_at is not None:
           raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="User not found")
@@ -130,7 +134,7 @@ def get_user_profile(user:User):
 
 #update the user profile
 
-def update_profile(body:UpdateUserProfile,db:Session,user:User):
+async def update_profile(body:UpdateUserProfile,db:AsyncSession,user:User):
     if user.deleted_at is not None:
           raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="User not found")
     data=body.model_dump()
@@ -138,20 +142,28 @@ def update_profile(body:UpdateUserProfile,db:Session,user:User):
     for field,value in data.items():
             setattr(user,field,value)
 
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
 
     return user
 
 
 # delete user
-def delete_user(db:Session,user:User):
-    user= db.query(User).filter(User.id==user.id).first()
+async def delete_user(db:AsyncSession,user:User):
+    result = await db.execute(select(User).where(User.id==user.id))
+    user= result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
     if user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="User already deleted")
             
     user.deleted_at=datetime.now(ZoneInfo("Asia/Kathmandu"))
-    db.commit()
+    await db.commit()
 
     return {
             "message":"User deleted",
@@ -161,7 +173,7 @@ def delete_user(db:Session,user:User):
 
 # change password
 
-def change_password(body:ChangePassword,db:Session,user:User):
+async def change_password(body:ChangePassword,db:AsyncSession,user:User):
 
     if not body.old_password or not body.old_password.strip():
             raise HTTPException(
@@ -178,6 +190,8 @@ def change_password(body:ChangePassword,db:Session,user:User):
                  status_code=status.HTTP_400_BAD_REQUEST,
                  detail="Enter confirm new password"
              )
+    if user.deleted_at is not None:
+          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
 
     if not verify_password(body.old_password,user.password):
           raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Old password is invalid")
@@ -185,9 +199,10 @@ def change_password(body:ChangePassword,db:Session,user:User):
     if body.confirm_new_password != body.new_password:
           raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Confirm New password doesn't match")
 
+
     user.password=get_password_hash(body.new_password)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
 
     return{
           "message":"Password changed successfully",
