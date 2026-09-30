@@ -4,6 +4,7 @@ from sqlalchemy import select
 from src.utils.db import get_db
 from src.users.models import User
 import jwt
+from src.hospitals.models import Hospital
 from src.utils.settings import settings
 from jwt.exceptions import InvalidTokenError
 
@@ -56,7 +57,7 @@ async def is_user_authenticated(request: Request,db: AsyncSession = Depends(get_
 
 
 # for admin authentication
-async def is_admin_authenticated(request: Request,db: AsyncSession = Depends(get_db)):
+async def is_hospital_authenticated(request: Request,db: AsyncSession = Depends(get_db)):
     try:
 
         token = request.headers.get("Authorization")
@@ -71,32 +72,28 @@ async def is_admin_authenticated(request: Request,db: AsyncSession = Depends(get
 
         data = jwt.decode(token,settings.SECRET_KEY,algorithms=[settings.ALGORITHM])
 
-        admin_id = data.get("_id")
-        role = data.get("role")
+        hospital_id = data.get("_id")
+        
 
 
         # Check role
-        if role != "super_admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not a admin"
-            )
+       
 
         # Find admin in User table
-        result= await db.execute(select(User).where(User.id==admin_id))
-        admin = result.scalar_one_or_none()
+        result= await db.execute(select(Hospital).where(Hospital.id==hospital_id))
+        hospital = result.scalar_one_or_none()
 
-        if not admin:
+        if not hospital:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Admin does not exist"
+                detail="Hospital does not exist"
             )
 
-        return admin
+        return hospital
 
     except InvalidTokenError:
 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Admin token is expired or incorrect"
+            detail="Hospital token is expired or incorrect"
         )

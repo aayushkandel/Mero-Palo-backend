@@ -108,13 +108,18 @@ async def login_user(body:UserLogin,db:AsyncSession ):
 
     user= result.scalar_one_or_none()
 
-    if user.deleted_at is not None:
-          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="User not found")
     if not user:
            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid phone no")
 
+    
     if not verify_password(body.password,user.password):
            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid password")
+
+    
+    
+    if user.deleted_at is not None:
+          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="User is deleted")
+    
     exp_time=datetime.now()+timedelta(minutes=settings.EXP_TIME)
     token=jwt.encode({"_id":user.id,"role":user.role,"exp":exp_time},settings.SECRET_KEY,settings.ALGORITHM)
 

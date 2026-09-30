@@ -5,7 +5,7 @@ from src.utils.db import get_db
 from src.users import controller
 from src.utils import is_auth
 from src.users.models import User
-from src.utils.is_auth import is_user_authenticated,is_admin_authenticated
+from src.utils.is_auth import is_user_authenticated
 
 user_routes= APIRouter(prefix="/users")
 
@@ -21,9 +21,7 @@ async def login(body:UserLogin,db:AsyncSession=Depends(get_db)):
 async def user_authenticate(request:Request, db:AsyncSession = Depends(get_db)):
     return await  is_auth.is_user_authenticated(request,db)
 
-@user_routes.get("/is_admin_auth",status_code=status.HTTP_200_OK)
-async def admin_authenticate(request:Request, db:AsyncSession = Depends(get_db)):
-    return await is_auth.is_admin_authenticated(request,db)
+
 
 # get user profile
 @user_routes.get("/profile",status_code=status.HTTP_200_OK)
