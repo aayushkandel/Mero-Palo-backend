@@ -109,7 +109,7 @@ async def login_user(body:UserLogin,db:AsyncSession ):
     user= result.scalar_one_or_none()
 
     if not user:
-           raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid phone no")
+           raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="User not found")
 
     
     if not verify_password(body.password,user.password):
@@ -123,7 +123,9 @@ async def login_user(body:UserLogin,db:AsyncSession ):
     exp_time=datetime.now()+timedelta(minutes=settings.EXP_TIME)
     token=jwt.encode({"_id":user.id,"role":user.role,"exp":exp_time},settings.SECRET_KEY,settings.ALGORITHM)
 
-    return {"token":token}
+    return {"token":token,
+                "role":user.role
+            }
     
 
     # get user profile

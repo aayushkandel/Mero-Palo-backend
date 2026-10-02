@@ -127,3 +127,49 @@ async def is_department_authenticated(request:Request,db:AsyncSession=Depends(ge
 
     except InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Department token is expired or incorrect")
+
+
+async def is_superAdmin_authenticated(request: Request,db: AsyncSession = Depends(get_db)):
+    try:
+
+        token = request.headers.get("authorization")
+
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Login First"
+            )
+
+        token = token.split(" ")[-1]
+
+        data = jwt.decode(token,settings.SECRET_KEY,algorithms=[settings.ALGORITHM])
+
+        admin_id = data.get("_id")
+        role=data.get("role")
+
+        if role != "superAdmin":
+            raise HTTPException(
+                    status_code=404,
+                    detail="You are not a Super Admin"
+            )
+
+        result=await db.execute(select(User).where(User.id==admin_id))
+        admin = result.scalar_one_or_none()
+
+        if not admin:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User does not exist"
+            )
+
+        return admin
+
+    
+
+    except InvalidTokenError:
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token is expired or incorrect"
+        )
+

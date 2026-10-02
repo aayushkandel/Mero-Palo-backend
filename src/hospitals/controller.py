@@ -72,6 +72,7 @@ async def register(body: HospitalRegister, db: AsyncSession):
             exist_phone.password = get_password_hash(body.password)
             exist_phone.registration_no = registration_no
             exist_phone.deleted_at = None
+            exist_phone.is_authorized=False
 
             await db.commit()
             await db.refresh(exist_phone)
@@ -174,6 +175,10 @@ async def login(body:HospitalLogin,db:AsyncSession):
 
     if hospital.deleted_at is not None:
           raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Hospital not found ")
+
+    if hospital.is_authorized != True:
+          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"Your hospital {hospital.name} is not authorized by admin yet, please wait!")
+    
     exp_time=datetime.now()+timedelta(minutes=settings.EXP_TIME)
 
     token= jwt.encode({"_id":hospital.id,"phone":hospital.phone,"exp":exp_time},settings.SECRET_KEY, settings.ALGORITHM)
@@ -309,10 +314,6 @@ async def depart_register(body: DepartmentRegister,db: AsyncSession,hospital: Ho
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password didn't matched"
         )
-
-    # ---------------------------------------------
-    # CLEAN / LOWERCASE VALUES
-    # ---------------------------------------------
 
     department_name = body.name.strip().lower()
     department_room_no = body.department_room_no.strip().lower()
