@@ -10,7 +10,7 @@ class Hospital(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     huid = Column(String(12),unique=True,nullable=False,default=generate_uid)
     name=Column(String(255),nullable=False)
-    phone=Column(String(20),nullable=False, unique=True)
+    phone=Column(String(20),nullable=False)
     email=Column(String(50),nullable=True,unique=True)
     address=Column(String(255),nullable=True)
     registration_no=Column(String(255),nullable=False,unique=True)

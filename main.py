@@ -11,6 +11,7 @@ from src.token.models import Token
 
 from src.users.router import user_routes
 from src.hospitals.router import hospital_routes
+from src.departments.router import department_routes
 
 
 @asynccontextmanager
@@ -30,3 +31,4 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(user_routes)
 app.include_router(hospital_routes)
+app.include_router(department_routes)

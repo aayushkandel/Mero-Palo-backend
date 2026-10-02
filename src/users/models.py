@@ -12,7 +12,7 @@ class User(Base):
     name=Column(String(255),nullable=True)
     email = Column(String(255), unique=True, nullable=True)
     address = Column(String(255), nullable=True)
-    phone=Column(String(20),nullable=False,unique=True)
+    phone=Column(String(20),nullable=False)
     role=Column(String(50),nullable=False)
     password=Column(String(255), nullable=False)
     created_at=Column(DateTime(timezone=True),server_default=func.now(),nullable=False)

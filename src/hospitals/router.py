@@ -2,10 +2,11 @@ from fastapi import APIRouter,Depends,status,Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.hospitals.dtos import HospitalRegister,HospitalLogin,HospitalProfileUpdate,ChangePassword
 from src.utils.db import get_db
+from src.departments.dtos import DepartmentRegister,DepartmentUpdate
 from src.hospitals import controller
 from src.utils import is_auth
 from src.hospitals.models import Hospital
-from src.utils.is_auth import is_user_authenticated,is_hospital_authenticated
+from src.utils.is_auth import is_hospital_authenticated
 
 
 hospital_routes=APIRouter(prefix="/hospitals")
@@ -38,3 +39,35 @@ async def delete_hospital(db:AsyncSession=Depends(get_db),hospital:Hospital=Depe
 @hospital_routes.put("/change_password",status_code=status.HTTP_200_OK)
 async def password_change(body:ChangePassword,db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
     return await controller.change_password(body, db, hospital)
+
+# department register route
+@hospital_routes.post("/depart_register",status_code=status.HTTP_201_CREATED)
+async def department_register(body:DepartmentRegister,db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
+    return await controller.depart_register(body, db, hospital)
+
+
+# get single department profile
+@hospital_routes.get("/{department_id}/profile",status_code=status.HTTP_200_OK)
+async def get_department(department_id: int,hospital: Hospital = Depends(is_hospital_authenticated),db: AsyncSession = Depends(get_db)):
+    return await controller.get_department_profile(department_id,hospital,db)
+
+# get all department
+@hospital_routes.get("/all_department",status_code=status.HTTP_200_OK)
+async def get_all_department(hospital:Hospital=Depends(is_hospital_authenticated),db:AsyncSession=Depends(get_db)):
+    return await controller.get_all_department(hospital,db)
+
+# update a single department data
+
+@hospital_routes.put("/update_department/{department_id}",status_code=status.HTTP_200_OK)
+async def update_department(department_id:int, body:DepartmentUpdate, db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
+    return await controller.update_department_profile(department_id,body,db,hospital)
+
+@hospital_routes.delete("/delete_department/{department_id}",status_code=status.HTTP_200_OK)
+async def delete_department(department_id:int,db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
+    return await controller.delete_department(department_id,db,hospital)
+
+# change department password by hospital
+@hospital_routes.put("/change_depart_password/{department_id}",status_code=status.HTTP_200_OK)
+async def change_department_password(body:ChangePassword,department_id:int, db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
+    return await  controller.change_depart_password(body,department_id,db,hospital)
+    
