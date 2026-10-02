@@ -13,7 +13,7 @@ class Hospital(Base):
     phone=Column(String(20),nullable=False)
     email=Column(String(50),nullable=True,unique=True)
     address=Column(String(255),nullable=True)
-    registration_no=Column(String(255),nullable=False,unique=True)
+    registration_no=Column(String(255),nullable=False)
     password=Column(String(255), nullable=False)
     is_authorized= Column(Boolean,nullable=False,default=False)
     created_at = Column(DateTime,server_default=func.now(),nullable=False)
