@@ -55,4 +55,5 @@ def get_department_profile(department:Department):
             "department_room_no":department.department_room_no,
             "duid":department.duid
       }
-        
+
+

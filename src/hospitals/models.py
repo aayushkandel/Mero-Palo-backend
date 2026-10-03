@@ -22,3 +22,4 @@ class Hospital(Base):
 
     departments = relationship("Department",back_populates="hospital",cascade="all, delete-orphan")
     tokens = relationship("Token",back_populates="hospital")
+    schedules = relationship("Schedule",back_populates="hospital")

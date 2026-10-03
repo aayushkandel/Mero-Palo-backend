@@ -24,3 +24,4 @@ async def admin_authenticate(request:Request, db:AsyncSession = Depends(get_db))
 @department_routes.get("/profile",status_code=status.HTTP_200_OK)
 async def get_department_profile(department:Department=Depends(is_department_authenticated)):
     return controller.get_department_profile(department)
+

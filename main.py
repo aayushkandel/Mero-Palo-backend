@@ -13,7 +13,7 @@ from src.users.router import user_routes
 from src.hospitals.router import hospital_routes
 from src.departments.router import department_routes
 from src.super_admin.router import super_admin_routes
-
+from src.token.router import token_routes
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,3 +34,4 @@ app.include_router(user_routes)
 app.include_router(hospital_routes)
 app.include_router(department_routes)
 app.include_router(super_admin_routes)
+app.include_router(token_routes)

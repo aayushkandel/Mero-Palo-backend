@@ -1,6 +1,6 @@
-from sqlalchemy import (Column,BigInteger,String,Integer,DateTime,Boolean,ForeignKey)
+from sqlalchemy import Column,BigInteger,String,Integer,DateTime,Boolean,ForeignKey,Time,Date
 from sqlalchemy.orm import relationship
-
+from sqlalchemy.sql import func
 from src.utils.db import Base
 from src.utils.uid import generate_uid
 
@@ -16,12 +16,14 @@ class Token(Base):
     patient_name=Column(String(255),nullable=False)
     patient_address=Column(String(255),nullable=False)
     patient_age=Column(Integer,nullable=False)
+    patient_phone=Column(String(20),nullable=False)
     token = Column(String(15),nullable=False)
-    date=Column(DateTime(timezone=True),nullable=False)
+    dates=Column(Date,nullable=False)
     started_at = Column(DateTime(timezone=True),nullable=True)
     ended_at = Column(DateTime(timezone=True),nullable=True)
-    expected_duration = Column(Integer,nullable=True)
-    actual_duration = Column(Integer,nullable=True)
+    expected_time = Column(Time,nullable=True)
+    actual_time = Column(Time,nullable=True)
+    waiting_time=Column(Time,nullable=True)
     token_status = Column(String(20),nullable=False,default="waiting")
     deleted_by_user =Column(DateTime(timezone=True),nullable=True)
     deleted_by_department =Column(DateTime(timezone=True),nullable=True)
@@ -34,3 +36,5 @@ class Token(Base):
     hospital = relationship("Hospital",back_populates="tokens")
     
     department = relationship("Department",back_populates="tokens")
+
+    

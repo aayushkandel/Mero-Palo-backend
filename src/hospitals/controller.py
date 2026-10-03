@@ -1,8 +1,8 @@
 from src.hospitals.dtos import HospitalRegister,HospitalLogin,HospitalProfileUpdate,ChangePassword
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select,func
-from src.departments.dtos import DepartmentRegister,DepartmentUpdate
-from src.departments.models import Department
+from src.departments.dtos import DepartmentRegister,DepartmentUpdate,ScheduleCreate,OpenStatus,ScheduleDate
+from src.departments.models import Department,Schedule
 from src.hospitals.models import Hospital
 from fastapi import HTTPException,status
 from src.utils.password_hash import get_password_hash,verify_password
@@ -668,4 +668,148 @@ async def change_depart_password(body:ChangePassword,department_id:int,db:AsyncS
               "message":"Password changed successfully",
               "name":department.name
       }
-      
+
+
+# creating controller for monthly schedule of department by hospital
+
+async def create_schedule(body:ScheduleCreate,department_id:int,db:AsyncSession,hospital:Hospital):
+
+       if  not body.dates :
+                          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Enter Dates")
+       if body.open_status == OpenStatus.Open:
+       
+            if not body.registration_start :
+                          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Enter Registration start Time")
+
+            if not body.registration_close:
+                          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Enter Registration close time")
+
+            if not body.token_start :
+                          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Enter Token start time")
+            
+            if body.registration_start >= body.registration_close:
+              raise HTTPException(
+                     status_code=status.HTTP_400_BAD_REQUEST,
+                     detail="Registration close time must be after  registration close time"
+              )
+
+       elif body.open_status == OpenStatus.Close:
+
+           body.registration_start = None
+           body.registration_close = None
+           body.token_start = None
+
+       result= await db.execute(select(Department).where(
+              Department.id==department_id,
+              Department.hospital_id==hospital.id,
+              Department.deleted_at.is_(None)
+       ))
+
+       department=result.scalar_one_or_none()
+
+       if not department:
+              raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Department not found for hospital {hospital.name} with department id {department_id}")
+
+
+       schedules=[ ]
+
+       for schedule_dates in body.dates:
+
+              # checking dublicate schedule for single day by department of a hospital
+              result= await db.execute(select(Schedule).where(
+                     Schedule.department_id==department_id,
+                     Schedule.hospital_id== hospital.id,
+                     Schedule.date==schedule_dates,
+              ))
+
+              existing_schedule=result.scalar_one_or_none()
+
+              if existing_schedule:
+                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                         detail=f"Schedule already exist for {schedule_dates}")
+
+              schedule=Schedule(
+                     hospital_id=hospital.id,
+                     department_id=department_id,
+                     date=schedule_dates,
+                     open_status=body.open_status,
+                     registration_start=body.registration_start,
+                     registration_close=body.registration_close,
+                     token_start=body.token_start
+              )
+              db.add(schedule)
+              schedules.append(schedule)
+
+       await db.commit()
+
+       return{
+              "message":"Schedule created successfully",
+              "department_id":department_id,
+              "open_status":body.open_status,
+              "total_schedules":len(schedules),
+              "dates":body.dates
+       }
+
+
+# get single schedule of a department by date
+
+async def get_schedule_by_date(body:ScheduleDate,department_id:int,db:AsyncSession,hospital:Hospital):
+
+       if not body.dates:
+              raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Give Date")
+
+       result=await db.execute(select(Schedule).where(
+              Schedule.date==body.dates,
+              Schedule.department_id==department_id,
+              Schedule.hospital_id==hospital.id
+       ))
+
+       schedule=result.scalar_one_or_none()
+
+       if not schedule:
+              raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                  detail=f"Schedule not found for {body.dates}")
+
+       return schedule
+
+async def get_all_schedules(department_id:int, db:AsyncSession,hospital:Hospital):
+    result=await db.execute(select(Department).where(
+           Department.id==department_id,
+           Department.hospital_id==hospital.id,
+           Department.deleted_at.is_(None)
+    ))
+
+    department=result.scalar_one_or_none()
+
+    if not department:
+           raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Department not found")
+
+    result=await db.execute(select(Schedule).where(
+           Schedule.department_id==department_id,
+           Schedule.hospital_id==hospital.id
+    )
+    .order_by(Schedule.date)
+    )
+
+    schedules=result.scalars().all()
+
+    return{
+        "department_id": department_id,
+        "total_schedules": len(schedules),
+        "schedules": [
+            {
+                "id": schedule.id,
+                "suid": schedule.suid,
+                "date": schedule.date,
+                "open_status": schedule.open_status,
+                "registration_start": schedule.registration_start,
+                "registration_close": schedule.registration_close,
+                "token_start": schedule.token_start,
+                "created_at": schedule.created_at,
+                "updated_at": schedule.updated_at
+            }
+            for schedule in schedules
+        ]
+    }
+
+       

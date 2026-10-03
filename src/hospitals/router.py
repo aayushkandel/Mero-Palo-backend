@@ -2,7 +2,7 @@ from fastapi import APIRouter,Depends,status,Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.hospitals.dtos import HospitalRegister,HospitalLogin,HospitalProfileUpdate,ChangePassword
 from src.utils.db import get_db
-from src.departments.dtos import DepartmentRegister,DepartmentUpdate
+from src.departments.dtos import DepartmentRegister,DepartmentUpdate,ScheduleCreate,ScheduleDate
 from src.hospitals import controller
 from src.utils import is_auth
 from src.hospitals.models import Hospital
@@ -70,4 +70,18 @@ async def delete_department(department_id:int,db:AsyncSession=Depends(get_db),ho
 @hospital_routes.put("/change_depart_password/{department_id}",status_code=status.HTTP_200_OK)
 async def change_department_password(body:ChangePassword,department_id:int, db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
     return await  controller.change_depart_password(body,department_id,db,hospital)
-    
+
+# creating department monthly schedule
+@hospital_routes.post("/schedule/{department_id}",status_code=status.HTTP_201_CREATED)
+async def create_schedule(body:ScheduleCreate,department_id:int,db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
+    return await controller.create_schedule(body,department_id,db,hospital)
+
+# get single schedule of a department by date
+
+@hospital_routes.get("/single_schedule/{department_id}",status_code=status.HTTP_200_OK)
+async def get_single_schedule(body:ScheduleDate,department_id:int,db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
+    return await controller.get_schedule_by_date(body,department_id,db,hospital)
+
+@hospital_routes.get("/all_schedules/{department_id}",status_code=status.HTTP_200_OK)
+async def all_schedule(department_id:int,db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
+    return await controller.get_all_schedules(department_id,db,hospital)
