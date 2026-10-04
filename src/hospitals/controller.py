@@ -687,10 +687,10 @@ async def create_schedule(body:ScheduleCreate,department_id:int,db:AsyncSession,
             if not body.token_start :
                           raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Enter Token start time")
             
-            if body.registration_start >= body.registration_close:
+            if body.registration_close >= body.registration_start:
               raise HTTPException(
                      status_code=status.HTTP_400_BAD_REQUEST,
-                     detail="Registration close time must be after  registration close time"
+                     detail="Registration close time must be after  registration open time"
               )
 
        elif body.open_status == OpenStatus.Close:

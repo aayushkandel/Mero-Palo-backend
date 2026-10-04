@@ -97,5 +97,6 @@ async def generate_token(
 
     # Final token
     token_number = f"{next_number:03d}"
+    token_value= f"{hospital_prefix}-{department_prefix}-{token_number}"
 
-    return f"{hospital_prefix}-{department_prefix}-{token_number}"
+    return token_value,next_number
