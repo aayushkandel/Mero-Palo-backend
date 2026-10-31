@@ -21,9 +21,7 @@ async def create_token(
     user: User
 ):
 
-    # =========================================================
     # VALIDATION
-    # =========================================================
 
     if not body.dates:
         raise HTTPException(
@@ -55,9 +53,8 @@ async def create_token(
             detail="Enter patient phone"
         )
 
-    # =========================================================
+    
     # GET HOSPITAL
-    # =========================================================
 
     hospital_result = await db.execute(
         select(Hospital).where(
@@ -74,9 +71,7 @@ async def create_token(
             detail="Hospital not found"
         )
 
-    # =========================================================
     # GET DEPARTMENT
-    # =========================================================
 
     department_result = await db.execute(
         select(Department).where(
@@ -94,9 +89,7 @@ async def create_token(
             detail="Department not found"
         )
 
-    # =========================================================
     # GET SCHEDULE
-    # =========================================================
 
     schedule_result = await db.execute(
         select(Schedule).where(
@@ -120,9 +113,7 @@ async def create_token(
             detail="Token service start time is not configured"
         )
 
-    # =========================================================
     # GET EXISTING TOKENS FOR THIS DEPARTMENT AND DATE
-    # =========================================================
 
     tokens_result = await db.execute(
         select(Token)
@@ -136,26 +127,22 @@ async def create_token(
 
     existing_tokens = tokens_result.scalars().all()
 
-    # =========================================================
     # CHECK WHETHER ACTUAL TOKEN SERVICE HAS STARTED
-    #
+    
     # IMPORTANT:
-    #
+    
     # schedule.token_start = planned service start
-    #
+    
     # token.started_at = actual service start
-    #
+    
     # We use started_at here.
-    # =========================================================
 
     service_started = any(
         token.started_at is not None
         for token in existing_tokens
     )
 
-    # =========================================================
     # GENERATE TOKEN
-    # =========================================================
 
     token, token_number = await generate_token(
         hospital_id=hospital_id,
@@ -164,29 +151,26 @@ async def create_token(
         db=db
     )
 
-    # =========================================================
     # CALCULATE EXPECTED TIME
-    # =========================================================
 
     if service_started:
 
-        # -----------------------------------------------------
         # Service has already started.
-        #
+        
         # Do NOT use:
-        #
+        
         # calculate_expected_time()
-        #
+        
         # because that uses the fixed +3 minute calculation.
-        # -----------------------------------------------------
+        
 
         expected_time = calculate_new_token_expected_time(
             tokens=existing_tokens
         )
 
-        # -----------------------------------------------------
+        
         # Safety check
-        # -----------------------------------------------------
+        
 
         if expected_time is None:
             raise HTTPException(
@@ -196,20 +180,20 @@ async def create_token(
 
     else:
 
-        # -----------------------------------------------------
+        
         # Service has NOT started.
-        #
+        
         # Use the original schedule-based prediction.
-        # -----------------------------------------------------
+        
 
         expected_time = calculate_expected_time(
             schedule.token_start,
             token_number
         )
 
-    # =========================================================
+    
     # CREATE TOKEN
-    # =========================================================
+    
 
     new_token = Token(
 
@@ -248,9 +232,9 @@ async def create_token(
         deleted_by_department=None
     )
 
-    # =========================================================
+    
     # SAVE
-    # =========================================================
+    
 
     db.add(new_token)
 
@@ -269,9 +253,9 @@ async def get_first_waiting_token(
     department: Department
 ):
 
-    # ---------------------------------------------------------
+    
     # Get oldest waiting token
-    # ---------------------------------------------------------
+    
 
     result = await db.execute(
         select(Token)
@@ -294,15 +278,15 @@ async def get_first_waiting_token(
             detail="No waiting token found for this date"
         )
 
-    # ---------------------------------------------------------
+    
     # Current actual start time
-    # ---------------------------------------------------------
+    
 
     started_at = datetime.now(timezone.utc)
 
-    # ---------------------------------------------------------
+    
     # Find previous completed token
-    # ---------------------------------------------------------
+    
 
     previous_result = await db.execute(
         select(Token)
@@ -320,9 +304,9 @@ async def get_first_waiting_token(
 
     previous_token = previous_result.scalar_one_or_none()
 
-    # ---------------------------------------------------------
+    
     # Calculate actual waiting time
-    # ---------------------------------------------------------
+    
 
     if previous_token:
 
@@ -341,9 +325,9 @@ async def get_first_waiting_token(
         # First token has no previous completed token.
         token.waiting_time = 0
 
-    # ---------------------------------------------------------
+    
     # Start token
-    # ---------------------------------------------------------
+    
 
     token.started_at = started_at
 

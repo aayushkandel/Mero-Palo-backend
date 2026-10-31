@@ -31,4 +31,4 @@ class ScheduleCreate(BaseModel):
     open_status:OpenStatus
 
 class ScheduleDate(BaseModel):
-    dates:date
+    dates:list[date]

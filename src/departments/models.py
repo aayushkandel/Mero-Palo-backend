@@ -16,6 +16,7 @@ class Department(Base):
     phone=Column(String(20),nullable=True)
     department_room_no=Column(String(50),nullable=True)
     password=Column(String(255),nullable=False)
+    thumbnail=Column(String(500),nullable=True)
     created_at = Column(DateTime,server_default=func.now(),nullable=False)
     updated_at = Column(DateTime,server_default=func.now(),onupdate=func.now(),nullable=False )
     deleted_at=Column(DateTime(timezone=True),nullable=True)
@@ -25,6 +26,16 @@ class Department(Base):
     hospital = relationship("Hospital",back_populates="departments")
     tokens = relationship("Token",back_populates="department")
     schedules = relationship("Schedule",back_populates="department")
+
+
+class DepartmentGallary(Base):
+        __tablename__="departmentsgallary"
+
+        
+        id=Column(BigInteger,primary_key=True, autoincrement=True)
+        dguid=Column(String(12),unique=True,nullable=False,default=generate_uid)
+        department_id=Column(BigInteger,ForeignKey("departments.id"),nullable=False)
+        image=Column(String(500),nullable=False)
 
 class Schedule(Base):
             __tablename__="schedules"

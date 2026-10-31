@@ -8,28 +8,12 @@ DEFAULT_EXECUTION_SECONDS = 180
 DEFAULT_WAITING_SECONDS = 0
 
 
-def calculate_dynamic_expected_times(
-    tokens
-):
-    """
-    Recalculate expected_time for all waiting tokens.
-
-    Completed tokens:
-        Use their actual execution_duration.
-
-    Waiting time:
-        Use actual waiting_time where available.
-
-    Future tokens:
-        Use average execution duration and average waiting time.
-    """
+def calculate_dynamic_expected_times(tokens):
 
     if not tokens:
         return
 
-    # ---------------------------------------------------------
     # Calculate average execution duration
-    # ---------------------------------------------------------
 
     execution_values = [
         token.execution_duration
@@ -43,9 +27,9 @@ def calculate_dynamic_expected_times(
     else:
         average_execution = DEFAULT_EXECUTION_SECONDS
 
-    # ---------------------------------------------------------
+
     # Calculate average waiting time
-    # ---------------------------------------------------------
+
 
     waiting_values = [
         token.waiting_time
@@ -59,9 +43,8 @@ def calculate_dynamic_expected_times(
     else:
         average_waiting = DEFAULT_WAITING_SECONDS
 
-    # ---------------------------------------------------------
     # Find the last token which has actually finished
-    # ---------------------------------------------------------
+ 
 
     completed_tokens = [
         token
@@ -72,9 +55,9 @@ def calculate_dynamic_expected_times(
 
     completed_tokens.sort(key=lambda token: token.id)
 
-    # ---------------------------------------------------------
+
     # Find the last completed token's end time
-    # ---------------------------------------------------------
+
 
     if completed_tokens:
         last_completed_token = completed_tokens[-1]
@@ -96,9 +79,8 @@ def calculate_dynamic_expected_times(
         else:
             return
 
-    # ---------------------------------------------------------
     # Update remaining waiting tokens
-    # ---------------------------------------------------------
+  
 
     waiting_tokens = [
         token
@@ -111,11 +93,10 @@ def calculate_dynamic_expected_times(
 
     for token in waiting_tokens:
 
-        # -----------------------------------------------------
         # Expected start of this token
         #
         # First add average waiting time.
-        # -----------------------------------------------------
+    
 
         predicted_start = (
             current_time
@@ -126,10 +107,9 @@ def calculate_dynamic_expected_times(
             NEPAL_TIMEZONE
         ).time().replace(microsecond=0)
 
-        # -----------------------------------------------------
+
         # After this token starts, we predict its execution
         # duration before calculating the next token.
-        # -----------------------------------------------------
 
         current_time = (
             predicted_start

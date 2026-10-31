@@ -6,16 +6,10 @@ from fastapi  import HTTPException,status
 from src.token.models import Token
 
 
-async def generate_token(
-    hospital_id: int,
-    department_id: int,
-    dates,
-    db: AsyncSession
-):
+async def generate_token(hospital_id: int,department_id: int,dates,db: AsyncSession):
 
     # Get hospital
-    hospital_result = await db.execute(
-        select(Hospital).where(
+    hospital_result = await db.execute(select(Hospital).where(
             Hospital.id == hospital_id,
             Hospital.deleted_at.is_(None)
         )
@@ -24,15 +18,13 @@ async def generate_token(
     hospital = hospital_result.scalar_one_or_none()
 
     if not hospital:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
             detail="Hospital not found"
         )
 
 
     # Get department
-    department_result = await db.execute(
-        select(Department).where(
+    department_result = await db.execute(select(Department).where(
             Department.id == department_id,
             Department.hospital_id == hospital_id,
             Department.deleted_at.is_(None)
@@ -66,8 +58,7 @@ async def generate_token(
 
     # Get last token for this department on this date
     result = await db.execute(
-        select(Token)
-        .where(
+        select(Token) .where(
             Token.hospital_id == hospital_id,
             Token.department_id == department_id,
             Token.dates == dates

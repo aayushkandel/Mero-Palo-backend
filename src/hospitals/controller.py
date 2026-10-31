@@ -2,15 +2,21 @@ from src.hospitals.dtos import HospitalRegister,HospitalLogin,HospitalProfileUpd
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select,func
 from src.departments.dtos import DepartmentRegister,DepartmentUpdate,ScheduleCreate,OpenStatus,ScheduleDate
-from src.departments.models import Department,Schedule
-from src.hospitals.models import Hospital
-from fastapi import HTTPException,status
+from src.departments.models import Department,Schedule,DepartmentGallary
+from src.hospitals.models import Hospital,HospitalGallary
+from fastapi import HTTPException,status,UploadFile
 from src.utils.password_hash import get_password_hash,verify_password
 import jwt
 from datetime import datetime, timedelta,timezone
 from src.utils.settings import settings
 from zoneinfo import ZoneInfo
 
+from src.utils.image_uploader import (
+    upload_image,
+    delete_uploaded_file,
+    DEPARTMENT_THUMBNAIL_DIR,
+    DEPARTMENT_GALLERY_DIR
+)
 
 # hospital register
 async def register(body: HospitalRegister, db: AsyncSession):
@@ -73,6 +79,7 @@ async def register(body: HospitalRegister, db: AsyncSession):
             exist_phone.registration_no = registration_no
             exist_phone.deleted_at = None
             exist_phone.is_authorized=False
+            exist_phone.thumbnail=None
 
             await db.commit()
             await db.refresh(exist_phone)
@@ -83,7 +90,8 @@ async def register(body: HospitalRegister, db: AsyncSession):
                 "name": exist_phone.name.title(),
                 "phone": exist_phone.phone,
                 "registration_no": exist_phone.registration_no.upper(),
-                "is_authorized": exist_phone.is_authorized
+                "is_authorized": exist_phone.is_authorized,
+                "thumbnail":exist_phone.thumbnail
             }
 
         raise HTTPException(
@@ -129,7 +137,8 @@ async def register(body: HospitalRegister, db: AsyncSession):
         registration_no=registration_no,
         password=hash_password,
         is_authorized=False,
-        deleted_at=None
+        deleted_at=None,
+        thumbnail=None
     )
 
     db.add(new_hospital)
@@ -143,7 +152,8 @@ async def register(body: HospitalRegister, db: AsyncSession):
         "name": new_hospital.name.title(),
         "phone": new_hospital.phone,
         "registration_no": new_hospital.registration_no.upper(),
-        "is_authorized": new_hospital.is_authorized
+        "is_authorized": new_hospital.is_authorized,
+        "thumbnail":new_hospital.thumbnail
     }
 
 
@@ -343,6 +353,7 @@ async def depart_register(body: DepartmentRegister,db: AsyncSession,hospital: Ho
             exist_phone.password=get_password_hash(body.password)
             exist_phone.department_room_no=department_room_no
             exist_phone.deleted_at=None
+            exist_phone.thumbnail=None
 
             await db.commit()
             await db.refresh(exist_phone)
@@ -352,8 +363,8 @@ async def depart_register(body: DepartmentRegister,db: AsyncSession,hospital: Ho
                    "duid": exist_phone.duid,
                    "name": exist_phone.name.title(),
                     "phone": exist_phone.phone,
-                    "department_room_no":exist_phone.department_room_no
-                    
+                    "department_room_no":exist_phone.department_room_no,
+                    "thumbnail":exist_phone.thumbnail
             }
         raise HTTPException(
               status_code=status.HTTP_400_BAD_REQUEST,
@@ -404,7 +415,8 @@ async def depart_register(body: DepartmentRegister,db: AsyncSession,hospital: Ho
         hospital_id=hospital.id,
         department_room_no=department_room_no,
         password=hash_password,
-        deleted_at=None
+        deleted_at=None,
+        thumbnail=None,
     )
 
     db.add(new_department)
@@ -418,7 +430,8 @@ async def depart_register(body: DepartmentRegister,db: AsyncSession,hospital: Ho
           "hospital_id":new_department.hospital_id,
           "name":new_department.name.title(),
           "phone":new_department.phone,
-          "department_room_no":new_department.department_room_no
+          "department_room_no":new_department.department_room_no,
+          "thumbnail":new_department.thumbnail,
     }
 # get department profile
 
@@ -687,7 +700,7 @@ async def create_schedule(body:ScheduleCreate,department_id:int,db:AsyncSession,
             if not body.token_start :
                           raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Enter Token start time")
             
-            if body.registration_close >= body.registration_start:
+            if body.registration_start>= body.registration_close :
               raise HTTPException(
                      status_code=status.HTTP_400_BAD_REQUEST,
                      detail="Registration close time must be after  registration open time"
@@ -753,24 +766,36 @@ async def create_schedule(body:ScheduleCreate,department_id:int,db:AsyncSession,
 
 # get single schedule of a department by date
 
-async def get_schedule_by_date(body:ScheduleDate,department_id:int,db:AsyncSession,hospital:Hospital):
+async def get_schedule_by_date(
+    body: ScheduleDate,
+    department_id: int,
+    db: AsyncSession,
+    hospital: Hospital
+):
 
-       if not body.dates:
-              raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Give Date")
+    if not body.dates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Give Dates"
+        )
 
-       result=await db.execute(select(Schedule).where(
-              Schedule.date==body.dates,
-              Schedule.department_id==department_id,
-              Schedule.hospital_id==hospital.id
-       ))
+    result = await db.execute(
+        select(Schedule).where(
+            Schedule.date.in_(body.dates),
+            Schedule.department_id == department_id,
+            Schedule.hospital_id == hospital.id
+        ).order_by(Schedule.date)
+    )
 
-       schedule=result.scalar_one_or_none()
+    schedules = result.scalars().all()
 
-       if not schedule:
-              raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                  detail=f"Schedule not found for {body.dates}")
+    if not schedules:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Schedule not found for the selected dates"
+        )
 
-       return schedule
+    return schedules
 
 async def get_all_schedules(department_id:int, db:AsyncSession,hospital:Hospital):
     result=await db.execute(select(Department).where(
@@ -812,4 +837,497 @@ async def get_all_schedules(department_id:int, db:AsyncSession,hospital:Hospital
         ]
     }
 
-       
+
+
+
+
+async def schedule_update(
+    body: ScheduleCreate,
+    department_id: int,
+    db: AsyncSession,
+    hospital: Hospital
+):
+
+    if not body.dates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Enter Dates"
+        )
+
+    # Check duplicate dates in request
+    if len(body.dates) != len(set(body.dates)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Duplicate dates are not allowed"
+        )
+
+    # Validate schedule times
+    if body.open_status == OpenStatus.Open:
+
+        if not body.registration_start:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Enter Registration start Time"
+            )
+
+        if not body.registration_close:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Enter Registration close time"
+            )
+
+        if not body.token_start:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Enter Token start time"
+            )
+
+        if body.registration_start >= body.registration_close:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Registration close time must be after registration open time"
+            )
+
+    elif body.open_status == OpenStatus.Close:
+
+        body.registration_start = None
+        body.registration_close = None
+        body.token_start = None
+
+    # Check department
+    result = await db.execute(
+        select(Department).where(
+            Department.id == department_id,
+            Department.hospital_id == hospital.id,
+            Department.deleted_at.is_(None)
+        )
+    )
+
+    department = result.scalar_one_or_none()
+
+    if not department:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Department not found for hospital {hospital.name} with department id {department_id}"
+        )
+
+    # Find existing schedules for selected dates
+    result = await db.execute(
+        select(Schedule).where(
+            Schedule.department_id == department_id,
+            Schedule.hospital_id == hospital.id,
+            Schedule.date.in_(body.dates),
+            
+        )
+    )
+
+    existing_schedules = result.scalars().all()
+
+    # Check whether every selected date has a schedule
+    existing_dates = {item.date for item in existing_schedules}
+
+    missing_dates = [
+        selected_date
+        for selected_date in body.dates
+        if selected_date not in existing_dates
+    ]
+
+    if missing_dates:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No schedule found for dates: {missing_dates}"
+        )
+
+    # Update schedules
+    for existing_schedule in existing_schedules:
+
+        existing_schedule.open_status = body.open_status
+        existing_schedule.registration_start = body.registration_start
+        existing_schedule.registration_close = body.registration_close
+        existing_schedule.token_start = body.token_start
+
+    await db.commit()
+
+    return {
+        "message": "Schedule updated successfully",
+        "department_id": department_id,
+        "open_status": body.open_status,
+        "total_schedules": len(existing_schedules),
+        "dates": [item.date for item in existing_schedules]
+    }
+
+
+
+# hospital thumbnail uploader
+
+
+
+
+async def update_hospital_thumbnail(
+    file: UploadFile,
+    db: AsyncSession,
+    hospital: Hospital
+):
+
+    old_thumbnail = hospital.thumbnail
+    new_thumbnail = None
+
+    try:
+
+        # Upload new thumbnail
+        new_thumbnail = await upload_image(
+            file,
+            THUMBNAIL_DIR
+        )
+
+        # Update hospital thumbnail
+        hospital.thumbnail = new_thumbnail
+
+        await db.commit()
+        await db.refresh(hospital)
+
+        # Delete old thumbnail only after successful commit
+        if old_thumbnail:
+            delete_uploaded_file(old_thumbnail)
+
+        return {
+            "message": "Hospital thumbnail updated successfully",
+            "thumbnail": hospital.thumbnail
+        }
+
+    except Exception:
+        await db.rollback()
+
+        # Remove newly uploaded image if database update fails
+        if new_thumbnail:
+            delete_uploaded_file(new_thumbnail)
+
+        raise
+
+# hospital gallary controller
+
+async def upload_hospital_gallery(
+    files: list[UploadFile],
+    db: AsyncSession,
+    hospital: Hospital
+):
+
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please select at least one image"
+        )
+
+    uploaded_paths = []
+    gallery_records = []
+
+    try:
+
+        for file in files:
+
+            image_path = await upload_image(
+                file,
+                GALLERY_DIR
+            )
+
+            uploaded_paths.append(image_path)
+
+            gallery = HospitalGallary(
+                hospital_id=hospital.id,
+                image=image_path
+            )
+
+            gallery_records.append(gallery)
+
+        db.add_all(gallery_records)
+
+        await db.commit()
+
+        for gallery in gallery_records:
+            await db.refresh(gallery)
+
+        return {
+            "message": "Hospital gallery images uploaded successfully",
+            "total_images": len(gallery_records),
+            "images": [
+                {
+                    "id": gallery.id,
+                    "hguid": gallery.hguid,
+                    "image": gallery.image
+                }
+                for gallery in gallery_records
+            ]
+        }
+
+    except Exception:
+
+        await db.rollback()
+
+        # Delete uploaded files if database operation fails
+        for image_path in uploaded_paths:
+            delete_uploaded_file(image_path)
+
+        raise
+
+
+# delete the hospital gallary image
+
+
+async def delete_hospital_gallery(
+    gallery_id: int,
+    db: AsyncSession,
+    hospital: Hospital
+):
+
+    result = await db.execute(
+        select(HospitalGallary).where(
+            HospitalGallary.id == gallery_id,
+            HospitalGallary.hospital_id == hospital.id
+        )
+    )
+
+    gallery = result.scalar_one_or_none()
+
+    if not gallery:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gallery image not found"
+        )
+
+    image_path = gallery.image
+
+    try:
+
+        await db.delete(gallery)
+
+        await db.commit()
+
+        # Delete physical image after successful database deletion
+        delete_uploaded_file(image_path)
+
+        return {
+            "message": "Gallery image deleted successfully",
+            "gallery_id": gallery_id
+        }
+
+    except Exception:
+
+        await db.rollback()
+
+        raise
+
+
+
+
+# get hospital thumbnail
+async def get_hospital_thumbnail(db: AsyncSession, hospital: Hospital):
+
+    if not hospital.thumbnail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Hospital thumbnail not found"
+        )
+
+    return {
+        "message": "Thumbnail fetched successfully",
+        "thumbnail": hospital.thumbnail
+    }
+
+
+# get hospital gallary
+async def get_hospital_gallery(db: AsyncSession, hospital: Hospital):
+
+    result = await db.execute(
+        select(HospitalGallary).where(
+            HospitalGallary.hospital_id == hospital.id
+        )
+    )
+
+    images = result.scalars().all()
+
+    return {
+        "message": "Gallery images fetched successfully",
+        "images": [
+            {
+                "id": image.id,
+                "hguid": image.hguid,
+                "image": image.image
+            }
+            for image in images
+        ]
+    }
+
+# update department thumbnail
+async def update_department_thumbnail(
+    file: UploadFile,
+    department_id: int,
+    db: AsyncSession,
+    hospital: Hospital
+):
+    department = await get_hospital_department(
+        department_id, db, hospital
+    )
+
+    old_thumbnail = department.thumbnail
+
+    new_thumbnail = await upload_image(
+        file,
+        DEPARTMENT_THUMBNAIL_DIR
+    )
+
+    try:
+        department.thumbnail = new_thumbnail
+
+        await db.commit()
+        await db.refresh(department)
+
+    except Exception:
+        await db.rollback()
+        delete_uploaded_file(new_thumbnail)
+        raise
+
+    if old_thumbnail:
+        delete_uploaded_file(old_thumbnail)
+
+    return {
+        "message": "Department thumbnail updated successfully",
+        "thumbnail": department.thumbnail
+    }
+
+# get department thumbnail
+
+async def get_department_thumbnail(
+    department_id: int,
+    db: AsyncSession,
+    hospital: Hospital
+):
+    department = await get_hospital_department(
+        department_id, db, hospital
+    )
+
+    if not department.thumbnail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Department thumbnail not found"
+        )
+
+    return {
+        "message": "Department thumbnail fetched successfully",
+        "thumbnail": department.thumbnail
+    }
+
+
+# Upload images in department gallary
+async def upload_department_gallery(
+    files: list[UploadFile],
+    department_id: int,
+    db: AsyncSession,
+    hospital: Hospital
+):
+    department = await get_hospital_department(
+        department_id, db, hospital
+    )
+
+    uploaded_images = []
+
+    try:
+        for file in files:
+            image_path = await upload_image(
+                file,
+                DEPARTMENT_GALLERY_DIR
+            )
+
+            uploaded_images.append(image_path)
+
+            gallery_image = DepartmentGallary(
+                department_id=department.id,
+                image=image_path
+            )
+
+            db.add(gallery_image)
+
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+
+        for image_path in uploaded_images:
+            delete_uploaded_file(image_path)
+
+        raise
+
+    return {
+        "message": "Department gallery images uploaded successfully"
+    }
+
+# get department gallary images
+async def get_department_gallery(
+    department_id: int,
+    db: AsyncSession,
+    hospital: Hospital
+):
+    department = await get_hospital_department(
+        department_id, db, hospital
+    )
+
+    result = await db.execute(
+        select(DepartmentGallary).where(
+            DepartmentGallary.department_id == department.id
+        )
+    )
+
+    images = result.scalars().all()
+
+    return {
+        "message": "Department gallery fetched successfully",
+        "images": [
+            {
+                "id": image.id,
+                "dguid": image.dguid,
+                "image": image.image
+            }
+            for image in images
+        ]
+    }
+
+# delete department gallary images
+async def delete_department_gallery(
+    gallery_id: int,
+    department_id: int,
+    db: AsyncSession,
+    hospital: Hospital
+):
+    department = await get_hospital_department(
+        department_id, db, hospital
+    )
+
+    result = await db.execute(
+        select(DepartmentGallary).where(
+            DepartmentGallary.id == gallery_id,
+            DepartmentGallary.department_id == department.id
+        )
+    )
+
+    image = result.scalar_one_or_none()
+
+    if not image:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gallery image not found"
+        )
+
+    image_path = image.image
+
+    await db.delete(image)
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    delete_uploaded_file(image_path)
+
+    return {
+        "message": "Department gallery image deleted successfully"
+    }
