@@ -53,8 +53,8 @@ async def get_department(department_id: int,hospital: Hospital = Depends(is_hosp
 
 # get all department
 @hospital_routes.get("/all_department",status_code=status.HTTP_200_OK)
-async def get_all_department(hospital:Hospital=Depends(is_hospital_authenticated),db:AsyncSession=Depends(get_db)):
-    return await controller.get_all_department(hospital,db)
+async def get_all_department(db:AsyncSession=Depends(get_db),hospital:Hospital=Depends(is_hospital_authenticated)):
+    return await controller.get_all_department(db,hospital)
 
 # update a single department data
 
@@ -91,11 +91,9 @@ async def all_schedule(department_id:int,db:AsyncSession=Depends(get_db),hospita
     return await controller.get_all_schedules(department_id,db,hospital)
 
 # Update hospital thumbnail
-@hospital_routes.put("/update_thumbnail",status_code=status.HTTP_200_OK)
-async def update_thumbnail(file: UploadFile = File(...),db: AsyncSession = Depends(get_db),hospital: Hospital = Depends(is_hospital_authenticated)):
-
-    return await controller.update_hospital_thumbnail(file,db,hospital)
-
+@hospital_routes.put("/update_thumbnail/{gallery_id}",status_code=status.HTTP_200_OK)
+async def update_hospital_thumbnail(gallery_id: int,db: AsyncSession = Depends(get_db),hospital: Hospital = Depends(is_hospital_authenticated)):
+    return await controller.update_hospital_thumbnail(gallery_id,db,hospital)
 
 # Upload hospital gallery images
 @hospital_routes.post("/upload_gallery",status_code=status.HTTP_201_CREATED)
@@ -118,27 +116,79 @@ async def get_thumbnail(db: AsyncSession = Depends(get_db),hospital: Hospital = 
 async def get_gallery(db: AsyncSession = Depends(get_db),hospital: Hospital = Depends(is_hospital_authenticated)):
     return await controller.get_hospital_gallery(db, hospital)
 
-# update department thumbnail:
-@hospital_routes.put("/department/{department_id}/update_thumbnail",status_code=status.HTTP_200_OK)
-async def update_department_thumbnail(department_id: int,file: UploadFile = File(...),db: AsyncSession = Depends(get_db),hospital: Hospital = Depends(is_hospital_authenticated)):
-    return await controller.update_department_thumbnail(file, department_id, db, hospital)
+# Update department thumbnail
+@hospital_routes.put(
+    "/department/{department_id}/update_thumbnail/{gallery_id}",
+    status_code=status.HTTP_200_OK
+)
+async def update_department_thumbnail(
+    department_id: int,
+    gallery_id: int,
+    db: AsyncSession = Depends(get_db),
+    hospital: Hospital = Depends(is_hospital_authenticated)
+):
+    return await controller.update_department_thumbnail(
+        gallery_id, department_id, db, hospital
+    )
 
-# get department thumbnail
-@hospital_routes.get( "/department/{department_id}/get_thumbnail",status_code=status.HTTP_200_OK)
-async def get_department_thumbnail(department_id: int,db: AsyncSession = Depends(get_db),hospital: Hospital = Depends(is_hospital_authenticated)):
-    return await controller.get_department_thumbnail(department_id, db, hospital)
 
-# upload gallary for departments
-@hospital_routes.post("/department/{department_id}/upload_gallery",status_code=status.HTTP_201_CREATED)
-async def upload_department_gallery(department_id: int,files: list[UploadFile] = File(...),db: AsyncSession = Depends(get_db),hospital: Hospital = Depends(is_hospital_authenticated)):
-    return await controller.upload_department_gallery(files, department_id, db, hospital)
+# Get department thumbnail
+@hospital_routes.get(
+    "/department/{department_id}/get_thumbnail",
+    status_code=status.HTTP_200_OK
+)
+async def get_department_thumbnail(
+    department_id: int,
+    db: AsyncSession = Depends(get_db),
+    hospital: Hospital = Depends(is_hospital_authenticated)
+):
+    return await controller.get_department_thumbnail(
+        department_id, db, hospital
+    )
 
-# get gallary images of the department
-@hospital_routes.get("/department/{department_id}/get_gallery",status_code=status.HTTP_200_OK)
-async def get_department_gallery(department_id: int,db: AsyncSession = Depends(get_db),hospital: Hospital = Depends(is_hospital_authenticated)):
-    return await controller.get_department_gallery(department_id, db, hospital)
 
-# delete the images from the department gallary
-@hospital_routes.delete("/department/{department_id}/delete_gallery/{gallery_id}",status_code=status.HTTP_200_OK)
-async def delete_department_gallery(department_id: int,gallery_id: int,db: AsyncSession = Depends(get_db),hospital: Hospital = Depends(is_hospital_authenticated)):
-    return await controller.delete_department_gallery(gallery_id, department_id, db, hospital)
+# Upload department gallery
+@hospital_routes.post(
+    "/department/{department_id}/upload_gallery",
+    status_code=status.HTTP_201_CREATED
+)
+async def upload_department_gallery(
+    department_id: int,
+    files: list[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+    hospital: Hospital = Depends(is_hospital_authenticated)
+):
+    return await controller.upload_department_gallery(
+        files, department_id, db, hospital
+    )
+
+
+# Get department gallery
+@hospital_routes.get(
+    "/department/{department_id}/get_gallery",
+    status_code=status.HTTP_200_OK
+)
+async def get_department_gallery(
+    department_id: int,
+    db: AsyncSession = Depends(get_db),
+    hospital: Hospital = Depends(is_hospital_authenticated)
+):
+    return await controller.get_department_gallery(
+        department_id, db, hospital
+    )
+
+
+# Delete department gallery image
+@hospital_routes.delete(
+    "/department/{department_id}/delete_gallery/{gallery_id}",
+    status_code=status.HTTP_200_OK
+)
+async def delete_department_gallery(
+    department_id: int,
+    gallery_id: int,
+    db: AsyncSession = Depends(get_db),
+    hospital: Hospital = Depends(is_hospital_authenticated)
+):
+    return await controller.delete_department_gallery(
+        gallery_id, department_id, db, hospital
+    )

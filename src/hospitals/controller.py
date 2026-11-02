@@ -15,7 +15,8 @@ from src.utils.image_uploader import (
     upload_image,
     delete_uploaded_file,
     DEPARTMENT_THUMBNAIL_DIR,
-    DEPARTMENT_GALLERY_DIR
+    DEPARTMENT_GALLERY_DIR,THUMBNAIL_DIR,
+    GALLERY_DIR
 )
 
 # hospital register
@@ -471,7 +472,7 @@ async def get_department_profile(department_id: int,hospital: Hospital,db: Async
         "hospital_id": department.hospital_id
     }
 
-async def get_all_department(hospital:Hospital,db:AsyncSession):
+async def get_all_department(db:AsyncSession,hospital:Hospital):
        if hospital.deleted_at is not None:
                raise HTTPException(
                    status_code=status.HTTP_400_BAD_REQUEST,
@@ -500,6 +501,30 @@ async def get_all_department(hospital:Hospital,db:AsyncSession):
           }
           for department in departments
     ]
+
+# get single department
+async def get_single_department(
+    department_id: int,
+    db: AsyncSession,
+    hospital: Hospital
+):
+    result = await db.execute(
+        select(Department).where(
+            Department.id == department_id,
+            Department.hospital_id == hospital.id,
+            Department.deleted_at.is_(None)
+        )
+    )
+
+    department = result.scalar_one_or_none()
+
+    if not department:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Department not found"
+        )
+
+    return department
 
 
 async def update_department_profile(department_id: int,body: DepartmentUpdate,db: AsyncSession,hospital: Hospital):
@@ -962,47 +987,35 @@ async def schedule_update(
 
 
 
-
 async def update_hospital_thumbnail(
-    file: UploadFile,
+    gallery_id: int,
     db: AsyncSession,
     hospital: Hospital
 ):
+    result = await db.execute(
+        select(HospitalGallary).where(
+            HospitalGallary.id == gallery_id,
+            HospitalGallary.hospital_id == hospital.id
+        )
+    )
 
-    old_thumbnail = hospital.thumbnail
-    new_thumbnail = None
+    gallery = result.scalar_one_or_none()
 
-    try:
-
-        # Upload new thumbnail
-        new_thumbnail = await upload_image(
-            file,
-            THUMBNAIL_DIR
+    if not gallery:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gallery image not found"
         )
 
-        # Update hospital thumbnail
-        hospital.thumbnail = new_thumbnail
+    hospital.thumbnail = gallery.image
 
-        await db.commit()
-        await db.refresh(hospital)
+    await db.commit()
+    await db.refresh(hospital)
 
-        # Delete old thumbnail only after successful commit
-        if old_thumbnail:
-            delete_uploaded_file(old_thumbnail)
-
-        return {
-            "message": "Hospital thumbnail updated successfully",
-            "thumbnail": hospital.thumbnail
-        }
-
-    except Exception:
-        await db.rollback()
-
-        # Remove newly uploaded image if database update fails
-        if new_thumbnail:
-            delete_uploaded_file(new_thumbnail)
-
-        raise
+    return {
+        "message": "Hospital thumbnail updated successfully",
+        "thumbnail": hospital.thumbnail
+    }
 
 # hospital gallary controller
 
@@ -1158,42 +1171,44 @@ async def get_hospital_gallery(db: AsyncSession, hospital: Hospital):
     }
 
 # update department thumbnail
+# Update department thumbnail from existing gallery
+
 async def update_department_thumbnail(
-    file: UploadFile,
+    gallery_id: int,
     department_id: int,
     db: AsyncSession,
     hospital: Hospital
 ):
-    department = await get_hospital_department(
-        department_id, db, hospital
+    department = await get_single_department(
+        department_id,
+        db,
+        hospital
     )
 
-    old_thumbnail = department.thumbnail
-
-    new_thumbnail = await upload_image(
-        file,
-        DEPARTMENT_THUMBNAIL_DIR
+    result = await db.execute(
+        select(DepartmentGallary).where(
+            DepartmentGallary.id == gallery_id,
+            DepartmentGallary.department_id == department.id
+        )
     )
 
-    try:
-        department.thumbnail = new_thumbnail
+    gallery_image = result.scalar_one_or_none()
 
-        await db.commit()
-        await db.refresh(department)
+    if not gallery_image:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gallery image not found"
+        )
 
-    except Exception:
-        await db.rollback()
-        delete_uploaded_file(new_thumbnail)
-        raise
+    department.thumbnail = gallery_image.image
 
-    if old_thumbnail:
-        delete_uploaded_file(old_thumbnail)
+    await db.commit()
+    await db.refresh(department)
 
     return {
         "message": "Department thumbnail updated successfully",
         "thumbnail": department.thumbnail
     }
-
 # get department thumbnail
 
 async def get_department_thumbnail(
@@ -1201,15 +1216,11 @@ async def get_department_thumbnail(
     db: AsyncSession,
     hospital: Hospital
 ):
-    department = await get_hospital_department(
-        department_id, db, hospital
+    department = await get_single_department(
+        department_id,
+        db,
+        hospital
     )
-
-    if not department.thumbnail:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Department thumbnail not found"
-        )
 
     return {
         "message": "Department thumbnail fetched successfully",
@@ -1224,14 +1235,29 @@ async def upload_department_gallery(
     db: AsyncSession,
     hospital: Hospital
 ):
-    department = await get_hospital_department(
-        department_id, db, hospital
+    department = await get_single_department(
+        department_id,
+        db,
+        hospital
     )
+
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please select images to upload"
+        )
 
     uploaded_images = []
 
     try:
         for file in files:
+
+            if not file.content_type or not file.content_type.startswith("image/"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{file.filename} is not a valid image"
+                )
+
             image_path = await upload_image(
                 file,
                 DEPARTMENT_GALLERY_DIR
@@ -1257,7 +1283,8 @@ async def upload_department_gallery(
         raise
 
     return {
-        "message": "Department gallery images uploaded successfully"
+        "message": "Department gallery images uploaded successfully",
+        "count": len(uploaded_images)
     }
 
 # get department gallary images
@@ -1266,8 +1293,10 @@ async def get_department_gallery(
     db: AsyncSession,
     hospital: Hospital
 ):
-    department = await get_hospital_department(
-        department_id, db, hospital
+    department = await get_single_department(
+        department_id,
+        db,
+        hospital
     )
 
     result = await db.execute(
@@ -1280,25 +1309,32 @@ async def get_department_gallery(
 
     return {
         "message": "Department gallery fetched successfully",
+
+        "thumbnail": department.thumbnail,
+
         "images": [
             {
                 "id": image.id,
                 "dguid": image.dguid,
-                "image": image.image
+                "image": image.image,
+                "is_thumbnail": image.image == department.thumbnail
             }
             for image in images
         ]
     }
-
 # delete department gallary images
+# Delete department gallery image
+
 async def delete_department_gallery(
     gallery_id: int,
     department_id: int,
     db: AsyncSession,
     hospital: Hospital
 ):
-    department = await get_hospital_department(
-        department_id, db, hospital
+    department = await get_single_department(
+        department_id,
+        db,
+        hospital
     )
 
     result = await db.execute(
@@ -1318,10 +1354,16 @@ async def delete_department_gallery(
 
     image_path = image.image
 
-    await db.delete(image)
-
     try:
+
+        # Clear thumbnail if the deleted image is the thumbnail
+        if department.thumbnail == image_path:
+            department.thumbnail = None
+
+        await db.delete(image)
+
         await db.commit()
+
     except Exception:
         await db.rollback()
         raise
