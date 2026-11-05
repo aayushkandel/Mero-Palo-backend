@@ -53,7 +53,7 @@ app.include_router(super_admin_routes)
 app.include_router(token_routes)
 
 
-origins=['http://localhost:5173']
+origins=['http://localhost:5173','http://localhost:5174']
 
 app.add_middleware(
     CORSMiddleware,
